@@ -21,12 +21,18 @@ local function CheckForCrackModules()
     if info and info ~= "=[C]" then
         game.Players.LocalPlayer:Kick("Detected kick blocker.")
     end
-    local originalKick = game.Players.LocalPlayer.Kick
-    local info1 = debug.getinfo(originalKick)
+    local success, info = pcall(function()
+        return debug.getinfo(game.Players.LocalPlayer.Kick)
+    end)
 
-    if info1 and info1.source ~= "=[C]" then
-        game.Players.LocalPlayer:Kick("Kick подменён")
+    if success and info and info.source ~= "=[C]" then
+        warn("⚠️ Kick подменён")
+        -- Лог, кик или отправка в Discord
     end
+    if islclosure and islclosure(game.Players.LocalPlayer.Kick) then
+        warn("Kick подменён Lua-функцией")
+    end
+
 end
 
 CheckForCrackModules()
