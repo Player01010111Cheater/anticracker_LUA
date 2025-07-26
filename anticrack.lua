@@ -1,49 +1,36 @@
 local Players = game:GetService("Players")
 local lp = Players.LocalPlayer
 
-local suspiciousAPIs = {
-    "getgenv", "getgc", "getreg", "hookfunction", "checkcaller", "getconnections"
-}
+-- ⚠️ Проверка Kick (перехваченный через __namecall или прямой подменой)
+local function testKick()
+    local success, result = pcall(function()
+        local mt = getrawmetatable(game)
+        if not mt then return false end
 
--- 1. Проверка Kick
-local success, info = pcall(function()
-    return debug.getinfo(lp.Kick)
-end)
+        local test = setmetatable({}, { __namecall = function() return "ok" end })
+        return test:Kick() == "ok"
+    end)
 
-if not success or (info and info.source ~= "=[C]") then
-    warn("🚫 Kick был подменён")
-    lp:Kick("Обнаружена подмена Kick")
+    if success and result == "ok" then
+        return true -- перехват Kick
+    else
+        return false -- всё чисто
+    end
 end
 
--- 2. Проверка debug.getinfo самого себя
-local originalDebugInfo = rawget(debug, "getinfo")
-if not originalDebugInfo or tostring(originalDebugInfo):find("function: 0x") == false then
+-- ⚠️ Проверка подмены debug.getinfo
+local function testDebug()
+    local ok, info = pcall(function()
+        return debug.getinfo(warn)
+    end)
+    return not (ok and info and info.source == "=[C]")
+end
+
+-- 🧠 Реакция на нарушения
+if testKick() then
+    warn("🚫 Кик был перехвачен кряком")
+    lp:Kick("Обнаружен обход кика")
+elseif testDebug() then
     warn("🚫 debug.getinfo подменён")
-    lp:Kick("debug.getinfo был захучен")
-end
-
--- 3. Проверка перехвата namecall
-local testObj = setmetatable({}, {
-    __namecall = function(self, ...)
-        return "test"
-    end
-})
-
-local worked = false
-pcall(function()
-    worked = testObj:Kick()
-end)
-
-if not worked then
-    warn("🚫 Обнаружен хук на __namecall (обход Kick)")
-    lp:Kick("Обнаружена защита от кика через namecall")
-end
-
--- 4. Проверка опасных API
-for _, api in ipairs(suspiciousAPIs) do
-    local fn = rawget(_G, api) or rawget(getfenv(), api)
-    if typeof(fn) == "function" then
-        warn("🚨 Найден подозрительный модуль: " .. api)
-        lp:Kick("Запрещённая функция: " .. api)
-    end
+    lp:Kick("Подмена debug.getinfo")
 end
